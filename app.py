@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from LRClass import LRClass 
-import os,json,re
+import os,json,re, math
 
 UPLOAD_FOLDER = 'data'
 ALLOWED_EXTENSIONS = set(['csv','xlsx'])
@@ -22,11 +22,11 @@ def index():
 
 @app.route('/process/',methods=["GET","POST"]) # function cluster after send data
 def cluster_result():
-
+    N =False
     if 'file' in request.files:
         filecsv = request.files['file']
-
-        print(filecsv)
+        N = request.form["n"]
+        print(filecsv, N)
         if filecsv and allowed_file(filecsv.filename):
             filename = secure_filename(filecsv.filename)
             filecsv.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -36,20 +36,40 @@ def cluster_result():
     datatestPath = 'data/' + filecsv.filename
     
     c = LRClass(datatestPath)
-    datatest = c.datatest
-    data = []
-    for i in range(len(datatest.values)):
+    df = c.datatest
+    df = df if df.index.name == 'date' else df.set_index('date')
+    n_bulan = int(N)
 
-        data.append({
-            'date':str(datatest.values[i][0]).split(' ')[0],
-            'KD':datatest.values[i][1],
-            'SW':datatest.values[i][2],
-            'DD':datatest.values[i][3]
-        })
+    print(df)
+
+    columns = df.columns
+    columns_prediction = ['KD','SW','DD']
+    result = {}
+    for col in columns_prediction:
+        X_train, X_test, y_train, y_test = c.train_test_plit_data(df,col,columns)
+        model = c.model(X_train,y_train)
+
+        y_pred = model.predict(X_test)
+        print('ypred',y_pred)
+        forecast_pred = c.get_data_forecast(df,col,columns,n_bulan)
+        forecast_pred = model.predict(forecast_pred)
+        result_ = c.plot_data(df,col,forecast_pred,n_bulan)
+
+        listData = result_.values.tolist()
+        json_data = []
+        for i in range(len(listData)):
+            json_data.append({
+                'date':listData[i][0],
+                col: '-' if math.isnan(listData[i][1]) else listData[i][1],
+                'forecast': '-' if math.isnan(listData[i][2]) else listData[i][2],
+            })
+        
+        result[col] = json_data
 
     return jsonify({
-        'data': data,
-    })
+        'n_bulan': n_bulan,
+        'result':result
+    }),200
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080)) # port local env 
