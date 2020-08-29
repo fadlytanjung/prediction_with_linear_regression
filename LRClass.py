@@ -29,7 +29,10 @@ class LRClass:
     
     def read_data_excel(self, dataPath): # read excel
         data = pd.read_excel(dataPath)
-        data = read_data_excel('data/datafix.xlsx')
+        bulan = ['Januari','Februari','Maret','April',
+         'Mei','Juni','Juli','Agustus',
+         'September','Oktober','November','Desember'
+        ]
         data = data.iloc[1:-7] # get row 1-36 (avoid useless data)
         data['date'] = data.apply(lambda row: 
                                 str(row['TAHUN'])+'-'+
